@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Busca de Linhas Telefônicas</title>
+  <meta name="robots" content="noindex" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ======================= LOGIN ======================= -->
+  <div id="tela-login" class="oculto">
+    <form class="card-login" id="form-login">
+      <div class="logo">
+        <span class="marca">☎</span>
+        <div>
+          <h1>Linhas Telefônicas</h1>
+          <p>Acesso restrito — faça login</p>
+        </div>
+      </div>
+      <div class="campo" style="margin-bottom:12px">
+        <label>E-mail</label>
+        <input type="email" id="login-email" autocomplete="username" required />
+      </div>
+      <div class="campo" style="margin-bottom:16px">
+        <label>Senha</label>
+        <input type="password" id="login-senha" autocomplete="current-password" required />
+      </div>
+      <button class="btn" type="submit" style="width:100%">Entrar</button>
+      <div id="login-erro" class="aviso erro oculto"></div>
+    </form>
+  </div>
+
+  <!-- ======================= APP ======================= -->
+  <div id="app" class="oculto">
+    <header class="topo">
+      <span class="marca">☎</span>
+      <h1>Linhas Telefônicas · Vivo</h1>
+      <span class="espaco"></span>
+      <span class="usuario" id="usuario-label"></span>
+      <button class="btn sec peq" id="btn-sair" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)">Sair</button>
+    </header>
+
+    <main>
+      <div class="indicadores">
+        <div class="ind"><div class="rot">Total de linhas</div><div class="num" id="i-total">—</div></div>
+        <div class="ind"><div class="rot">Com responsável</div><div class="num" id="i-com">—</div></div>
+        <div class="ind alerta"><div class="rot">Sem responsável</div><div class="num" id="i-sem">—</div></div>
+        <div class="ind"><div class="rot">Resultados</div><div class="num" id="i-result">—</div></div>
+      </div>
+
+      <div class="filtros">
+        <div class="campo busca-grande">
+          <label>Buscar (número, responsável, setor, empresa, conta, aparelho…)</label>
+          <input id="f-busca" placeholder="Digite para pesquisar…" autocomplete="off" />
+        </div>
+        <div class="campo">
+          <label>Tipo</label>
+          <select id="f-tipo">
+            <option value="">Todos</option>
+            <option value="PRE_PAGA">Pré-paga</option>
+            <option value="POS_PAGA">Pós-paga</option>
+            <option value="CONTROLE">Controle</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label>Setor</label>
+          <select id="f-setor"><option value="">Todos</option></select>
+        </div>
+        <div class="campo">
+          <label>Responsável</label>
+          <select id="f-resp"><option value="">Todos</option></select>
+        </div>
+        <div class="campo">
+          <label>&nbsp;</label>
+          <label style="flex-direction:row;gap:6px;align-items:center;font-weight:500;cursor:pointer">
+            <input type="checkbox" id="f-sem" style="width:auto" /> Só sem responsável
+          </label>
+        </div>
+        <button class="btn sec" id="btn-limpar">Limpar</button>
+        <button class="btn" id="btn-nova">+ Nova linha</button>
+      </div>
+
+      <div class="tabela-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Número</th>
+              <th class="esconde-mobile">Tipo</th>
+              <th>Responsável</th>
+              <th class="esconde-mobile">Setor</th>
+              <th class="esconde-mobile">Empresa / Conta</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="corpo"></tbody>
+        </table>
+        <div id="vazio" class="vazio oculto">Nenhuma linha encontrada.</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal edição/criação -->
+  <div id="modal" class="modal-bg oculto">
+    <form class="modal" id="form-linha">
+      <h2 id="modal-titulo">Editar linha</h2>
+      <input type="hidden" id="e-id" />
+      <div class="grid2">
+        <div class="campo"><label>Número</label><input id="e-numero" placeholder="(14) 99999-9999" required /></div>
+        <div class="campo"><label>Tipo</label>
+          <select id="e-tipo">
+            <option value="PRE_PAGA">Pré-paga</option>
+            <option value="POS_PAGA">Pós-paga</option>
+            <option value="CONTROLE">Controle</option>
+          </select>
+        </div>
+        <div class="campo"><label>Responsável</label><input id="e-responsavel" list="lista-resp" /></div>
+        <div class="campo"><label>Setor</label><input id="e-setor" list="lista-setor" /></div>
+        <div class="campo"><label>Status</label><input id="e-status" placeholder="ATIVA" /></div>
+        <div class="campo"><label>Aparelho</label><input id="e-aparelho" /></div>
+        <div class="campo"><label>Empresa</label><input id="e-empresa" /></div>
+        <div class="campo"><label>CNPJ</label><input id="e-cnpj" /></div>
+        <div class="campo"><label>Conta (operadora)</label><input id="e-conta" /></div>
+        <div class="campo"><label>Operadora</label><input id="e-operadora" placeholder="Vivo Empresas" /></div>
+      </div>
+      <div class="campo" style="margin-top:12px"><label>Observações</label><textarea id="e-obs" rows="2"></textarea></div>
+      <datalist id="lista-resp"></datalist>
+      <datalist id="lista-setor"></datalist>
+      <div id="modal-erro" class="aviso erro oculto"></div>
+      <div class="modal-acoes">
+        <button type="button" class="btn sec" id="btn-cancelar">Cancelar</button>
+        <button type="submit" class="btn" id="btn-salvar">Salvar</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

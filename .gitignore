@@ -1,0 +1,12 @@
+# Node (caso adicione tooling depois)
+node_modules/
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# DADOS REAIS — nunca versionar (repositório é público para o GitHub Pages).
+# O seed com números/nomes fica só na sua máquina; você roda no Supabase.
+supabase/03-seed.sql
+supabase/*-real*.sql
