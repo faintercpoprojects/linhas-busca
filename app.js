@@ -1,88 +1,70 @@
 /* ===========================================================================
-   App de busca de linhas telefônicas — Supabase + JS puro.
+   App de busca de linhas telefônicas — Firebase (Firestore + Auth) + JS puro.
    =========================================================================== */
 (function () {
   "use strict";
 
-  const cfg = window.CONFIG || {};
-  const configurado =
-    cfg.SUPABASE_URL &&
-    cfg.SUPABASE_ANON &&
-    !cfg.SUPABASE_URL.includes("COLE_AQUI") &&
-    !cfg.SUPABASE_ANON.includes("COLE_AQUI");
+  const cfg = (window.CONFIG && window.CONFIG.firebase) || {};
+  const configurado = cfg.apiKey && cfg.projectId && !String(cfg.apiKey).includes("COLE_AQUI");
 
-  if (!configurado) {
+  if (!configurado || !window.firebase) {
     document.body.innerHTML =
       '<div style="max-width:560px;margin:60px auto;padding:24px;font-family:system-ui;line-height:1.6">' +
-      "<h2>⚙️ Falta configurar o Supabase</h2>" +
-      "<p>Abra o arquivo <code>config.js</code> e preencha <code>SUPABASE_URL</code> e " +
-      "<code>SUPABASE_ANON</code> com os dados do seu projeto Supabase " +
-      "(Project Settings → API). Depois recarregue esta página.</p></div>";
+      "<h2>⚙️ Falta configurar o Firebase</h2>" +
+      "<p>Abra <code>config.js</code> e preencha os dados do projeto Firebase " +
+      "(Configurações do projeto → Seus apps → SDK). Depois recarregue.</p></div>";
     return;
   }
 
-  const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON);
-  const exigirLogin = cfg.EXIGIR_LOGIN !== false;
+  firebase.initializeApp(cfg);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const COL = db.collection("linhas");
 
   const $ = (id) => document.getElementById(id);
   const telaLogin = $("tela-login");
   const app = $("app");
-
-  let todas = []; // cache local das linhas
+  let todas = [];
 
   // -------------------- Autenticação --------------------
-  async function iniciar() {
-    if (!exigirLogin) {
+  auth.onAuthStateChanged((user) => {
+    if (user) {
       telaLogin.classList.add("oculto");
       app.classList.remove("oculto");
-      $("usuario-label").textContent = "acesso público";
-      $("btn-sair").classList.add("oculto");
-      return carregar();
+      $("usuario-label").textContent = user.email;
+      carregar();
+    } else {
+      app.classList.add("oculto");
+      telaLogin.classList.remove("oculto");
     }
-    const { data } = await sb.auth.getSession();
-    if (data.session) mostrarApp(data.session);
-    else telaLogin.classList.remove("oculto");
-  }
-
-  function mostrarApp(session) {
-    telaLogin.classList.add("oculto");
-    app.classList.remove("oculto");
-    $("usuario-label").textContent = session.user.email;
-    carregar();
-  }
+  });
 
   $("form-login").addEventListener("submit", async (e) => {
     e.preventDefault();
     const erro = $("login-erro");
     erro.classList.add("oculto");
-    const { data, error } = await sb.auth.signInWithPassword({
-      email: $("login-email").value.trim(),
-      password: $("login-senha").value,
-    });
-    if (error) {
+    try {
+      await auth.signInWithEmailAndPassword(
+        $("login-email").value.trim(),
+        $("login-senha").value
+      );
+    } catch (_) {
       erro.textContent = "E-mail ou senha incorretos.";
       erro.classList.remove("oculto");
-      return;
     }
-    mostrarApp(data.session);
   });
 
-  $("btn-sair").addEventListener("click", async () => {
-    await sb.auth.signOut();
-    location.reload();
-  });
+  $("btn-sair").addEventListener("click", () => auth.signOut());
 
   // -------------------- Carregar dados --------------------
   async function carregar() {
-    const { data, error } = await sb
-      .from("linhas")
-      .select("*")
-      .order("numero_formatado", { ascending: true });
-    if (error) {
-      alert("Erro ao carregar linhas: " + error.message);
+    try {
+      const snap = await COL.orderBy("numero_formatado").get();
+      todas = snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+    } catch (e) {
+      alert("Erro ao carregar linhas: " + e.message);
       return;
     }
-    todas = data || [];
     preencherFiltros();
     atualizarIndicadores();
     render();
@@ -100,7 +82,7 @@
   }
 
   function atualizarIndicadores() {
-    const com = todas.filter((l) => l.responsavel && l.responsavel.trim()).length;
+    const com = todas.filter((l) => l.responsavel && String(l.responsavel).trim()).length;
     $("i-total").textContent = todas.length;
     $("i-com").textContent = com;
     $("i-sem").textContent = todas.length - com;
@@ -118,7 +100,7 @@
       if (tipo && l.tipo !== tipo) return false;
       if (setor && l.setor !== setor) return false;
       if (resp && l.responsavel !== resp) return false;
-      if (soSem && l.responsavel && l.responsavel.trim()) return false;
+      if (soSem && l.responsavel && String(l.responsavel).trim()) return false;
       if (q) {
         const alvo = norm(
           [l.numero, l.numero_formatado, l.responsavel, l.setor, l.empresa,
@@ -150,7 +132,7 @@
             : l.tipo === "PRE_PAGA"
             ? '<span class="selo pre">Pré-paga</span>'
             : '<span class="selo neutro">' + esc(rotTipo(l.tipo)) + "</span>";
-        const resp = l.responsavel && l.responsavel.trim()
+        const resp = l.responsavel && String(l.responsavel).trim()
           ? esc(l.responsavel)
           : '<span class="sem-resp">Sem responsável</span>';
         const empConta = [l.empresa, l.conta].filter(Boolean).map(esc).join(" · ") || "—";
@@ -215,6 +197,13 @@
       erro.classList.remove("oculto");
       return;
     }
+    // Impede número duplicado (exceto o próprio registro em edição).
+    const dup = todas.find((x) => x.numero === numeroCanon && x.id !== id);
+    if (dup) {
+      erro.textContent = "Este número já está cadastrado.";
+      erro.classList.remove("oculto");
+      return;
+    }
     const registro = {
       numero: numeroCanon,
       numero_formatado: numeroFmt,
@@ -229,14 +218,13 @@
       conta: ov($("e-conta").value),
       operadora: ov($("e-operadora").value),
       observacoes: ov($("e-obs").value),
+      atualizado_em: new Date().toISOString(),
     };
-    let resp;
-    if (id) resp = await sb.from("linhas").update(registro).eq("id", id);
-    else resp = await sb.from("linhas").insert(registro);
-    if (resp.error) {
-      erro.textContent = resp.error.message.includes("duplicate")
-        ? "Este número já está cadastrado."
-        : "Erro ao salvar: " + resp.error.message;
+    try {
+      if (id) await COL.doc(id).update(registro);
+      else await COL.add(registro);
+    } catch (err) {
+      erro.textContent = "Erro ao salvar: " + err.message;
       erro.classList.remove("oculto");
       return;
     }
@@ -251,7 +239,7 @@
     return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
   }
   function esc(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (c) =>
+    return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
     );
   }
@@ -259,13 +247,10 @@
   function rotTipo(t) {
     return { PRE_PAGA: "Pré-paga", POS_PAGA: "Pós-paga", CONTROLE: "Controle" }[t] || t || "—";
   }
-  // Número -> canônico 55 + DDD + assinante (só dígitos)
   function canon(entrada) {
     let d = (entrada || "").replace(/\D/g, "");
     if (d.startsWith("55") && d.length > 11) d = d.slice(2);
     if (d.length !== 10 && d.length !== 11) return null;
     return "55" + d;
   }
-
-  iniciar();
 })();

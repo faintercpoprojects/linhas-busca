@@ -1,12 +1,15 @@
-# Node (caso adicione tooling depois)
+# Node / seed tooling (não faz parte do site estático)
 node_modules/
+package.json
+package-lock.json
+seed.mjs
 *.log
+
+# DADOS REAIS e segredos — nunca versionar (repositório é público p/ Pages)
+seed-data.json
+*-real*.json
+*-real*.csv
 
 # Sistema
 .DS_Store
 Thumbs.db
-
-# DADOS REAIS — nunca versionar (repositório é público para o GitHub Pages).
-# O seed com números/nomes fica só na sua máquina; você roda no Supabase.
-supabase/03-seed.sql
-supabase/*-real*.sql
